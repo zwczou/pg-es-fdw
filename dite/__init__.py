@@ -5,8 +5,6 @@
 from multicorn import ForeignDataWrapper
 from multicorn.utils import log_to_postgres as log2pg
 
-from functools import partial
-
 import httplib
 import json
 import logging
@@ -20,6 +18,7 @@ class ElasticsearchFDW (ForeignDataWrapper):
         self.port = int(options.get('port', '9200'))
         self.node = options.get('node', '')
         self.index = options.get('index', '')
+        self._row_id_column = options.get('primary_key', columns.keys()[0])
 
         self.columns = columns
 
@@ -52,7 +51,7 @@ class ElasticsearchFDW (ForeignDataWrapper):
         for hit in data['hits']['hits']:
             row = {}
             for col in columns:
-                if col == 'id':
+                if col == self.rowid_column:
                     row[col] = hit['_id']
                 elif col in hit['_source']:
                     row[col] = hit['_source'][col]
@@ -66,7 +65,7 @@ class ElasticsearchFDW (ForeignDataWrapper):
         This column name should be subsequently present in every
         returned resultset.
         """
-        return 'id';
+        return self._row_id_column
 
     def es_index(self, id, values):
         content = json.dumps(values)
@@ -85,15 +84,14 @@ class ElasticsearchFDW (ForeignDataWrapper):
     def insert(self, new_values):
         log2pg('MARK Insert Request - new values:  %s' % new_values, logging.DEBUG)
 
-        if not 'id' in new_values:
-             log2pg('INSERT requires "id" column.  Missing in: %s' % new_values, logging.ERROR)
+        if not self.rowid_column in new_values:
+             log2pg('INSERT requires "%s" column.  Missing in: %s' % (self.rowid_colum, new_values), logging.ERROR)
 
-        id = new_values['id']
-        new_values.pop('id', None)
+        id = new_values.pop(self.rowid_column)
         return self.es_index(id, new_values)
 
     def update(self, id, new_values):
-        new_values.pop('id', None)
+        new_values.pop(self.rowid_column, None)
         return self.es_index(id, new_values)
 
     def delete(self, id):

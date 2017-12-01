@@ -52,7 +52,7 @@ CREATE FOREIGN TABLE articles_es (
     id bigint,
     title text,
     content text
-) SERVER multicorn_es OPTIONS (host '127.0.0.1', port '9200', node 'test', index 'articles');
+) SERVER multicorn_es OPTIONS (host '127.0.0.1', port '9200', node 'test', index 'articles', primary_key 'id');
 
 
 
